@@ -1,0 +1,51 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Hilversum Gigs",
+        "data": {
+          "sources": "Sources (one per line: Name | URL)",
+          "exclude_keywords": "Exclude keywords (comma separated)",
+          "last_minute_hours": "Last-minute window (hours)",
+          "new_days": "Count as 'new' for (days)"
+        }
+      }
+    },
+    "error": {
+      "no_sources": "Add at least one valid URL"
+    },
+    "abort": {
+      "already_configured": "Already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "sources": "Sources (one per line: Name | URL)",
+          "exclude_keywords": "Exclude keywords (comma separated)",
+          "last_minute_hours": "Last-minute window (hours)",
+          "new_days": "Count as 'new' for (days)"
+        }
+      }
+    },
+    "error": {
+      "no_sources": "Add at least one valid URL"
+    }
+  },
+  "entity": {
+    "calendar": {
+      "gigs": {
+        "name": "Gigs"
+      }
+    },
+    "sensor": {
+      "last_minute": {
+        "name": "Last-minute gigs"
+      },
+      "newly_announced": {
+        "name": "Newly announced gigs"
+      }
+    }
+  }
+}

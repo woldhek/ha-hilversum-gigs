@@ -1,0 +1,14 @@
+{
+  "domain": "hilversum_gigs",
+  "name": "Hilversum Gigs",
+  "codeowners": [
+    "@woldhek"
+  ],
+  "config_flow": true,
+  "documentation": "https://github.com/woldhek/ha-hilversum-gigs",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/woldhek/ha-hilversum-gigs/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

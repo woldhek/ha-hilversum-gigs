@@ -1,0 +1,51 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Hilversum Gigs",
+        "data": {
+          "sources": "Bronnen (één per regel: Naam | URL)",
+          "exclude_keywords": "Uitsluiten (komma-gescheiden)",
+          "last_minute_hours": "Last-minute venster (uren)",
+          "new_days": "Telt als 'nieuw' gedurende (dagen)"
+        }
+      }
+    },
+    "error": {
+      "no_sources": "Voeg minstens één geldige URL toe"
+    },
+    "abort": {
+      "already_configured": "Al ingesteld"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "sources": "Bronnen (één per regel: Naam | URL)",
+          "exclude_keywords": "Uitsluiten (komma-gescheiden)",
+          "last_minute_hours": "Last-minute venster (uren)",
+          "new_days": "Telt als 'nieuw' gedurende (dagen)"
+        }
+      }
+    },
+    "error": {
+      "no_sources": "Voeg minstens één geldige URL toe"
+    }
+  },
+  "entity": {
+    "calendar": {
+      "gigs": {
+        "name": "Optredens"
+      }
+    },
+    "sensor": {
+      "last_minute": {
+        "name": "Last-minute optredens"
+      },
+      "newly_announced": {
+        "name": "Nieuw aangekondigd"
+      }
+    }
+  }
+}
