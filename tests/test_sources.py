@@ -38,3 +38,22 @@ def test_tribe():
 def test_uid_stable():
     a = s.parse_jsonld(HTML, "V", "https://x/")[0]; b = s.parse_jsonld(HTML, "V", "https://x/")[0]
     assert a.uid == b.uid
+
+
+def test_vorstin_agenda():
+    html = (pathlib.Path(__file__).parent / "vorstin_agenda.html").read_text()
+    gigs = s.parse_slug_links(html, "De Vorstin", today=NOW.date())
+    by = {g.title: g for g in gigs}
+    assert len(gigs) > 50
+    assert by["Ellen ten Damme"].start.date().isoformat() == "2026-11-13"   # -13-11-2026
+    assert any(g.url.endswith("phil-campbells-bastard-sons-13112026/") and g.start.day == 13 for g in gigs)
+    assert any(g.url.endswith("paceshifters-play-nirvana-14-11-26/") and g.start.year == 2026 for g in gigs)
+    assert all(g.all_day and g.venue == "De Vorstin" for g in gigs)
+    assert not any("jamsessie" in g.url or "avrotros" in g.url for g in gigs)  # no date / past without year
+
+
+def test_slug_dates():
+    t = NOW.date()
+    assert s.date_from_slug("https://x/a-09012027/", t).isoformat() == "2027-01-09"
+    assert s.date_from_slug("https://x/a-24-04-27/", t).isoformat() == "2027-04-24"
+    assert s.date_from_slug("https://x/open-podium/", t) is None

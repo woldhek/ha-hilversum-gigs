@@ -41,6 +41,7 @@ class Gig:
     url: str | None
     source: str
     description: str = ""
+    all_day: bool = False  # only the date is known, not the start time
 
     def as_dict(self) -> dict:
         d = asdict(self)
@@ -76,11 +77,13 @@ def parse_dt(value) -> datetime | None:
     return dt if dt.tzinfo else dt.replace(tzinfo=TZ)
 
 
-def _make(source, venue_default, title, start, end, url, venue=None, desc="") -> Gig | None:
+def _make(source, venue_default, title, start, end, url, venue=None, desc="", all_day=False) -> Gig | None:
     title = _clean(title)
     if not title or not start:
         return None
-    if not end or end <= start:
+    if all_day:
+        end = start + timedelta(days=1)
+    elif not end or end <= start:
         end = start + timedelta(hours=3)
     return Gig(
         uid=_uid(source, title, start),
@@ -91,6 +94,7 @@ def _make(source, venue_default, title, start, end, url, venue=None, desc="") ->
         url=url,
         source=source,
         description=_clean(desc)[:500],
+        all_day=all_day,
     )
 
 
@@ -129,6 +133,46 @@ def parse_jsonld(html: str, source: str, base_url: str) -> list[Gig]:
             )
             if gig:
                 gigs.append(gig)
+    return gigs
+
+
+# ---------- Date in the link (De Vorstin) ----------
+# De Vorstin's agenda is drawn by React; the HTML only has a list of links for search engines, with the date
+# at the end of each slug: -13-11-2026/, -13112026/, -14-11-26/, or -24-10/ (no year).
+_PLACEHOLDER_RE = re.compile(
+    r'<a[^>]+class="[^"]*eagerly-seo-placeholder__container_item[^"]*"[^>]+href="([^"]+)"[^>]*>(.*?)</a>', re.S)
+_SLUG_DATE_RE = re.compile(r"-(\d{2})-?(\d{2})(?:-?(\d{4}|\d{2}))?/?$")
+
+
+def date_from_slug(url: str, today: date) -> date | None:
+    m = _SLUG_DATE_RE.search(url.rstrip("/") + "/")
+    if not m:
+        return None
+    d, mth, y = int(m[1]), int(m[2]), m[3]
+    if y is None:
+        year = today.year
+    else:
+        year = int(y) + (2000 if len(y) == 2 else 0)
+    try:
+        found = date(year, mth, d)
+    except ValueError:
+        return None
+    if y is None and found < today:  # no year in the slug: a past date is an old page
+        return None
+    return found
+
+
+def parse_slug_links(html: str, source: str, today: date | None = None) -> list[Gig]:
+    today = today or datetime.now(TZ).date()
+    gigs = []
+    for url, title in _PLACEHOLDER_RE.findall(html):
+        day = date_from_slug(url, today)
+        if not day:
+            continue  # recurring pages such as the jam session have no date
+        start = datetime.combine(day, time(0), TZ)
+        gig = _make(source, source, title, start, None, unescape(url), all_day=True)
+        if gig:
+            gigs.append(gig)
     return gigs
 
 
@@ -202,6 +246,10 @@ async def fetch_source(session: aiohttp.ClientSession, name: str, url: str) -> t
     gigs = parse_jsonld(body, name, url)
     if gigs:
         return gigs, "json-ld"
+
+    gigs = parse_slug_links(body, name)
+    if gigs:
+        return gigs, "slug-dates"
 
     # WordPress + The Events Calendar
     if "wp-content" in body or "/wp-json" in body or "/content/uploads/" in body:

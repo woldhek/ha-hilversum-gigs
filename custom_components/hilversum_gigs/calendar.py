@@ -15,6 +15,9 @@ from .sources import Gig
 
 def _to_event(g: Gig) -> CalendarEvent:
     desc = " ".join(x for x in (g.description, g.url or "") if x)
+    if g.all_day:
+        return CalendarEvent(start=g.start.date(), end=g.end.date(), summary=g.title,
+                             location=g.venue, description=desc, uid=g.uid)
     return CalendarEvent(start=g.start, end=g.end, summary=g.title,
                          location=g.venue, description=desc, uid=g.uid)
 
