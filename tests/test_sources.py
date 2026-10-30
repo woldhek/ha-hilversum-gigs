@@ -57,3 +57,18 @@ def test_slug_dates():
     assert s.date_from_slug("https://x/a-09012027/", t).isoformat() == "2027-01-09"
     assert s.date_from_slug("https://x/a-24-04-27/", t).isoformat() == "2027-04-24"
     assert s.date_from_slug("https://x/open-podium/", t) is None
+
+
+def test_vorstin_json():
+    import json as _json
+    data = _json.loads((pathlib.Path(__file__).parent / "vorstin_agenda.json").read_text())
+    gigs = {g.title: g for g in s.parse_vorstin_json(data, "De Vorstin")}
+    pride = gigs["Gooise Pride Party"]
+    assert pride.start == datetime(2026, 10, 30, 19, 30, tzinfo=TZ) and not pride.all_day
+    assert pride.venue == "De Vorstin, Kleine zaal" and pride.price == "€ 17,75"
+    assert pride.ticket_url.startswith("https://tickets.vorstin.nl/")
+    assert gigs["Jamsessie"].start.hour == 15 and gigs["Jamsessie"].price == "gratis"
+    assert gigs["Ellen ten Damme"].sold_out and gigs["Ellen ten Damme"].doors.hour == 19
+    assert gigs["Kei Foute Party"].end == datetime(2026, 11, 28, 1, 0, tzinfo=TZ)
+    out = s.filter_gigs(list(gigs.values()), ["dansfeest"], NOW)
+    assert "Kei Foute Party" not in {g.title for g in out}  # genre is filterable

@@ -6,7 +6,7 @@ Home Assistant integration for **live music in Hilversum only** — to catch las
 | Entity | What it does |
 |---|---|
 | `calendar.hilversum_gigs_gigs` | All upcoming gigs from the configured venues |
-| `sensor.hilversum_gigs_last_minute_gigs` | Count of gigs in the next 48 h (configurable); list in `gigs` attribute, per-source health in `sources` |
+| `sensor.hilversum_gigs_last_minute_gigs` | Count of gigs in the next 48 h (configurable); list in `gigs` attribute (title, start, venue, genre, price, sold_out, status, tickets), per-source health in `sources` |
 | `sensor.hilversum_gigs_newly_announced_gigs` | Gigs first seen in the last 7 days |
 | Event `hilversum_gigs_new_gig` | Fired once per newly announced gig (not on first install) |
 
@@ -17,9 +17,9 @@ One per line, `Name | URL`. Any venue page works if it offers one of:
 - an iCal feed (`.ics` / `webcal://`), or a link to one on the page
 - WordPress *The Events Calendar* REST API
 - schema.org `Event` JSON-LD (most ticketing/venue sites)
-- De Vorstin's agenda: dates read from the event links; these show as all-day events because the page has no start times
+- De Vorstin's own feed (`https://vorstin.nl/?agenda_json`, what their agenda page reads): start and door times, hall, genre, price, ticket link, sold out / postponed. A `vorstin.nl` agenda URL finds it by itself.
 
-Defaults: De Vorstin and Live Hilversum (city agenda, also covers classical/church concerts). `Exclude keywords` filters non-music items (film, workshop, markt…).
+Defaults: De Vorstin and Live Hilversum (city agenda, also covers classical/church concerts). `Exclude keywords` filters non-music items (film, workshop, comedy, bingo…); it also matches the genre, so e.g. `dansfeest` drops party nights.
 
 Verify a source before adding it:
 ```bash

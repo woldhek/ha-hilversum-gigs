@@ -14,11 +14,16 @@ from .sources import Gig
 
 
 def _to_event(g: Gig) -> CalendarEvent:
-    desc = " ".join(x for x in (g.description, g.url or "") if x)
+    extra = [
+        f"Deuren {g.doors:%H:%M}" if g.doors else "",
+        "UITVERKOCHT" if g.sold_out else g.price,
+        g.status.upper(),
+    ]
+    desc = "\n".join(x for x in (g.description, " · ".join(e for e in extra if e), g.ticket_url or g.url or "") if x)
     if g.all_day:
-        return CalendarEvent(start=g.start.date(), end=g.end.date(), summary=g.title,
+        return CalendarEvent(start=g.start.date(), end=g.end.date(), summary=f"{g.title} ({g.status})" if g.status else g.title,
                              location=g.venue, description=desc, uid=g.uid)
-    return CalendarEvent(start=g.start, end=g.end, summary=g.title,
+    return CalendarEvent(start=g.start, end=g.end, summary=f"{g.title} ({g.status})" if g.status else g.title,
                          location=g.venue, description=desc, uid=g.uid)
 
 

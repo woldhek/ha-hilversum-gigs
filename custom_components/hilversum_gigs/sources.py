@@ -42,11 +42,18 @@ class Gig:
     source: str
     description: str = ""
     all_day: bool = False  # only the date is known, not the start time
+    genre: str = ""
+    price: str = ""
+    ticket_url: str | None = None
+    sold_out: bool = False
+    doors: datetime | None = None
+    status: str = ""  # e.g. "verplaatst" (postponed)
 
     def as_dict(self) -> dict:
         d = asdict(self)
         d["start"] = self.start.isoformat()
         d["end"] = self.end.isoformat()
+        d["doors"] = self.doors.isoformat() if self.doors else None
         return d
 
 
@@ -136,7 +143,52 @@ def parse_jsonld(html: str, source: str, base_url: str) -> list[Gig]:
     return gigs
 
 
-# ---------- Date in the link (De Vorstin) ----------
+# ---------- De Vorstin's own feed ----------
+# The agenda page draws itself (React) from https://vorstin.nl/?agenda_json: {slug: event}, each with
+# times[] (program_start "YYYYmmddHHMM", door_open, location = hall, price, ticket_link, available, status_label).
+VORSTIN_JSON = "https://vorstin.nl/?agenda_json"
+
+
+def _vdt(value) -> datetime | None:
+    if not value or not isinstance(value, str) or len(value) != 12:
+        return None
+    try:
+        return datetime.strptime(value, "%Y%m%d%H%M").replace(tzinfo=TZ)
+    except ValueError:
+        return None
+
+
+def parse_vorstin_json(data: dict, source: str) -> list[Gig]:
+    gigs = []
+    for ev in data.values():
+        if not isinstance(ev, dict):
+            continue
+        genre = _clean((ev.get("tags") or {}).get("interests", ""))
+        for t in ev.get("times") or []:
+            start = _vdt(t.get("program_start"))
+            hall = t.get("location") or ""
+            label = (t.get("status_label") or "") if isinstance(t.get("status_label"), str) else ""
+            gig = _make(source, source, ev.get("title"), start, _vdt(t.get("program_end")), ev.get("permalink"),
+                        f"De Vorstin, {hall}" if hall else "De Vorstin",
+                        " ".join(x for x in (ev.get("storyline") or "", genre) if x))
+            if not gig:
+                continue
+            gig.genre = genre
+            gig.price = "gratis" if label.lower() == "gratis" else (f"€ {t['price']}" if t.get("price") else "")
+            gig.ticket_url = t.get("ticket_link") or None
+            gig.sold_out = t.get("available") is False or "uitverkocht" in label.lower()
+            gig.doors = _vdt(t.get("door_open"))
+            if label.lower() not in ("", "gratis", "uitverkocht"):
+                gig.status = label
+            gigs.append(gig)
+    return gigs
+
+
+def _looks_vorstin(data) -> bool:
+    return isinstance(data, dict) and any(isinstance(v, dict) and "times" in v for v in list(data.values())[:3])
+
+
+# ---------- Date in the link (De Vorstin fallback) ----------
 # De Vorstin's agenda is drawn by React; the HTML only has a list of links for search engines, with the date
 # at the end of each slug: -13-11-2026/, -13112026/, -14-11-26/, or -24-10/ (no year).
 _PLACEHOLDER_RE = re.compile(
@@ -243,6 +295,22 @@ async def fetch_source(session: aiohttp.ClientSession, name: str, url: str) -> t
     if "calendar" in ctype or body.lstrip().startswith("BEGIN:VCALENDAR"):
         return parse_ics(body, name), "ical"
 
+    if body.lstrip().startswith("{"):
+        try:
+            data = json.loads(body)
+        except json.JSONDecodeError:
+            data = None
+        if _looks_vorstin(data):
+            return parse_vorstin_json(data, name), "vorstin-json"
+
+    if urlparse(url).netloc.endswith("vorstin.nl") and "agenda_json" not in url:
+        try:
+            st, _, vbody = await _get(session, VORSTIN_JSON)
+            if st == 200 and _looks_vorstin(data := json.loads(vbody)):
+                return parse_vorstin_json(data, name), "vorstin-json"
+        except (aiohttp.ClientError, json.JSONDecodeError):
+            pass
+
     gigs = parse_jsonld(body, name, url)
     if gigs:
         return gigs, "json-ld"
@@ -283,7 +351,7 @@ def filter_gigs(gigs: list[Gig], exclude_keywords: list[str], now: datetime | No
     for g in sorted(gigs, key=lambda g: g.start):
         if g.end < now or g.uid in seen:
             continue
-        hay = f"{g.title} {g.description}".lower()
+        hay = f"{g.title} {g.description} {g.genre}".lower()
         if any(k in hay for k in ex):
             continue
         seen.add(g.uid)

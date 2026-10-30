@@ -12,7 +12,8 @@ from .const import (CONF_LAST_MINUTE_HOURS, CONF_NEW_DAYS, DEFAULT_LAST_MINUTE_H
 
 
 def _brief(g):
-    return {"title": g.title, "start": g.start.isoformat(), "venue": g.venue, "url": g.url}
+    return {"title": g.title, "start": g.start.isoformat(), "venue": g.venue, "genre": g.genre,
+            "price": g.price, "sold_out": g.sold_out, "status": g.status, "url": g.url, "tickets": g.ticket_url}
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
