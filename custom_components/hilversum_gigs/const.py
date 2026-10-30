@@ -20,6 +20,7 @@ DEFAULT_EXCLUDE = "film, rondleiding, workshop, markt, expositie, tentoonstellin
 
 EVENT_NEW_GIG = f"{DOMAIN}_new_gig"
 STORAGE_VERSION = 1
+STORAGE_KEY_SUFFIX = "seen_v2"  # v2: gigs present at setup are not "new"
 
 
 def parse_sources(text: str) -> list[tuple[str, str]]:

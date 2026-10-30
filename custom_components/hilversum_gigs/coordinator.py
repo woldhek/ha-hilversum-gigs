@@ -14,7 +14,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_EXCLUDE, CONF_SOURCES, DEFAULT_EXCLUDE, DEFAULT_SOURCES, DOMAIN,
-    EVENT_NEW_GIG, SCAN_INTERVAL, STORAGE_VERSION, parse_keywords, parse_sources, setting,
+    EVENT_NEW_GIG, SCAN_INTERVAL, STORAGE_VERSION, STORAGE_KEY_SUFFIX, parse_keywords, parse_sources, setting,
 )
 from .sources import Gig, fetch_source, filter_gigs
 
@@ -25,7 +25,7 @@ class GigsCoordinator(DataUpdateCoordinator[list[Gig]]):
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=SCAN_INTERVAL, config_entry=entry)
         self.entry = entry
-        self._store = Store(hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}.seen")
+        self._store = Store(hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}.{STORAGE_KEY_SUFFIX}")
         self.first_seen: dict[str, str] = {}  # uid -> ISO timestamp first discovered
         self.source_status: dict[str, str] = {}
         self._loaded = False
@@ -62,9 +62,12 @@ class GigsCoordinator(DataUpdateCoordinator[list[Gig]]):
         for g in gigs:
             if g.uid in self.first_seen:
                 continue
+            if initial_run:
+                # Already on the agenda when the integration was set up: not "new", and no alert.
+                self.first_seen[g.uid] = "1970-01-01T00:00:00+00:00"
+                continue
             self.first_seen[g.uid] = now_iso
-            if not initial_run:  # don't spam on first install
-                self.hass.bus.async_fire(EVENT_NEW_GIG, g.as_dict())
+            self.hass.bus.async_fire(EVENT_NEW_GIG, g.as_dict())
 
         # forget past events
         live = {g.uid for g in gigs}
