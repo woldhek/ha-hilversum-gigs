@@ -72,3 +72,24 @@ def test_vorstin_json():
     assert gigs["Kei Foute Party"].end == datetime(2026, 11, 28, 1, 0, tzinfo=TZ)
     out = s.filter_gigs(list(gigs.values()), ["dansfeest"], NOW)
     assert "Kei Foute Party" not in {g.title for g in out}  # genre is filterable
+
+
+def test_vioolkist_wp_ptb():
+    import json as _json
+    data = _json.loads((pathlib.Path(__file__).parent / "vioolkist_agenda.json").read_text())
+    assert s._looks_wp_ptb(data)
+    gigs = s.parse_wp_ptb(data, "De Vioolkist")
+    by = {g.title: g for g in gigs}
+    assert len(gigs) == 4  # the item without fields has no date
+    koffie = by["Koffieconcert in De Vioolkist"]
+    assert koffie.start == datetime(2026, 11, 8, 11, 0, tzinfo=TZ) and koffie.venue == "De Vioolkist"
+    assert koffie.ticket_url.startswith("https://studio-theater-de-vioolkist.weticket.io/")
+    assert by["DESRAY’S CIRCLE OF LIVE"].start.year == 2027
+    assert by["B-fem en de Vioolkist presenteren: Spark Lab Open Podium"].ticket_url.endswith("19-november-2026")
+    out = s.filter_gigs(gigs, ["besloten"], NOW)
+    assert "Besloten gelegenheid" not in {g.title for g in out}
+
+
+def test_archive_type_detection():
+    html = '<body class="archive post-type-archive post-type-archive-agenda wp-theme-x">'
+    assert s._ARCHIVE_TYPE_RE.search(html)[1] == "agenda"

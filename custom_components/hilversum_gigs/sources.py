@@ -188,6 +188,43 @@ def _looks_vorstin(data) -> bool:
     return isinstance(data, dict) and any(isinstance(v, dict) and "times" in v for v in list(data.values())[:3])
 
 
+# ---------- WordPress custom post types (De Vioolkist) ----------
+# Sites built with Themify Post Type Builder keep the event date in a custom field of the post, which the
+# public REST API returns: /wp-json/wp/v2/<type> -> [{title, link, ptb_metabox: {ptb_<type>_datum, ...}}].
+_DATEFIELD_RE = re.compile(r"^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}")
+
+
+def parse_wp_ptb(data: list, source: str, venue: str | None = None) -> list[Gig]:
+    gigs = []
+    for ev in data:
+        meta = ev.get("ptb_metabox")
+        if not isinstance(meta, dict):
+            continue  # an item without fields (no date) is skipped
+        when = next((v for k, v in meta.items() if "datum" in k or "date" in k), None)
+        if not (isinstance(when, str) and _DATEFIELD_RE.match(when)):
+            when = next((v for v in meta.values() if isinstance(v, str) and _DATEFIELD_RE.match(v)), None)
+        start = parse_dt(when)
+        intro = next((v for k, v in meta.items() if "intro" in k or "tekst" in k), "")
+        gig = _make(source, venue or source, (ev.get("title") or {}).get("rendered"), start, None,
+                    ev.get("link"), None, intro)
+        if not gig:
+            continue
+        tickets = next((v for k, v in meta.items() if "kaart" in k or "ticket" in k), None)
+        if isinstance(tickets, list):
+            gig.ticket_url = next((t.strip() for t in tickets if isinstance(t, str) and t.strip().startswith("http")), None)
+        elif isinstance(tickets, str) and tickets.strip().startswith("http"):
+            gig.ticket_url = tickets.strip()
+        gigs.append(gig)
+    return gigs
+
+
+def _looks_wp_ptb(data) -> bool:
+    return isinstance(data, list) and any(isinstance(e, dict) and "ptb_metabox" in e for e in data[:5])
+
+
+_ARCHIVE_TYPE_RE = re.compile(r'<body[^>]+class="[^"]*\bpost-type-archive-([a-z0-9_-]+)')
+
+
 # ---------- Date in the link (De Vorstin fallback) ----------
 # De Vorstin's agenda is drawn by React; the HTML only has a list of links for search engines, with the date
 # at the end of each slug: -13-11-2026/, -13112026/, -14-11-26/, or -24-10/ (no year).
@@ -302,12 +339,31 @@ async def fetch_source(session: aiohttp.ClientSession, name: str, url: str) -> t
             data = None
         if _looks_vorstin(data):
             return parse_vorstin_json(data, name), "vorstin-json"
+    if body.lstrip().startswith("["):
+        try:
+            data = json.loads(body)
+        except json.JSONDecodeError:
+            data = None
+        if _looks_wp_ptb(data):
+            return parse_wp_ptb(data, name), "wp-ptb"
 
     if urlparse(url).netloc.endswith("vorstin.nl") and "agenda_json" not in url:
         try:
             st, _, vbody = await _get(session, VORSTIN_JSON)
             if st == 200 and _looks_vorstin(data := json.loads(vbody)):
                 return parse_vorstin_json(data, name), "vorstin-json"
+        except (aiohttp.ClientError, json.JSONDecodeError):
+            pass
+
+    # A WordPress archive of a custom post type: ask the REST API for the posts with their fields
+    if (m := _ARCHIVE_TYPE_RE.search(body)) and "/wp-content/" in body:
+        root = f"{urlparse(url).scheme}://{urlparse(url).netloc}"
+        try:
+            st, _, apibody = await _get(session, f"{root}/wp-json/wp/v2/{m[1]}?per_page=100")
+            if st == 200 and _looks_wp_ptb(data := json.loads(apibody)):
+                gigs = parse_wp_ptb(data, name)
+                if gigs:
+                    return gigs, "wp-ptb"
         except (aiohttp.ClientError, json.JSONDecodeError):
             pass
 

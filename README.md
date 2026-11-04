@@ -17,9 +17,10 @@ One per line, `Name | URL`. Any venue page works if it offers one of:
 - an iCal feed (`.ics` / `webcal://`), or a link to one on the page
 - WordPress *The Events Calendar* REST API
 - schema.org `Event` JSON-LD (most ticketing/venue sites)
+- WordPress sites whose events are a custom post type with a date field (Themify Post Type Builder), e.g. De Vioolkist: the agenda URL is enough, the REST API is found by itself
 - De Vorstin's own feed (`https://vorstin.nl/?agenda_json`, what their agenda page reads): start and door times, hall, genre, price, ticket link, sold out / postponed. A `vorstin.nl` agenda URL finds it by itself.
 
-Defaults: De Vorstin and Live Hilversum (city agenda, also covers classical/church concerts). `Exclude keywords` filters non-music items (film, workshop, comedy, bingo…); it also matches the genre, so e.g. `dansfeest` drops party nights.
+Defaults: De Vorstin, De Vioolkist and Live Hilversum (city agenda, also covers classical/church concerts). `Exclude keywords` filters non-music items (film, workshop, comedy, bingo…); it also matches the genre, so e.g. `dansfeest` drops party nights.
 
 Verify a source before adding it:
 ```bash

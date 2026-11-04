@@ -14,9 +14,10 @@ SCAN_INTERVAL = timedelta(hours=3)
 # One per line: "Name | URL". Hilversum venues only; extend in the options.
 DEFAULT_SOURCES = "\n".join([
     "De Vorstin | https://vorstin.nl/?agenda_json",
+    "De Vioolkist | https://devioolkist.nl/agenda/",
     "Live Hilversum | https://www.livehilversum.com/nl/agenda",
 ])
-DEFAULT_EXCLUDE = "film, rondleiding, workshop, markt, expositie, tentoonstelling, comedy, bingo"
+DEFAULT_EXCLUDE = "film, rondleiding, workshop, markt, expositie, tentoonstelling, comedy, bingo, besloten"
 
 EVENT_NEW_GIG = f"{DOMAIN}_new_gig"
 STORAGE_VERSION = 1
