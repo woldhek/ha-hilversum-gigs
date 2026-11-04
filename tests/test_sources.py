@@ -93,3 +93,18 @@ def test_vioolkist_wp_ptb():
 def test_archive_type_detection():
     html = '<body class="archive post-type-archive post-type-archive-agenda wp-theme-x">'
     assert s._ARCHIVE_TYPE_RE.search(html)[1] == "agenda"
+
+
+def test_heuvellaan():
+    d = pathlib.Path(__file__).parent
+    gigs = s.parse_heuvellaan_agenda((d / "heuvellaan_agenda.html").read_text(), "Heuvellaan")
+    by = {g.title: g for g in gigs}
+    assert len(gigs) == 3 and all(g.all_day for g in gigs)
+    assert by["Heuvellaan Serveert: Aisling & Magnus"].genre == "heuvellaan concert"
+    jm = by["Jong Metropole + Jeangu Macrooy"]
+    detail = s.parse_heuvellaan_detail((d / "heuvellaan_concert.html").read_text())
+    assert detail == {"time": (20, 0), "place": "Heuvellaan Hilversum, Studio 1",
+                      "tickets": "https://mco.stager.co/shop/default/events/111658400"}
+    s.apply_heuvellaan_detail(jm, detail)
+    assert jm.start == datetime(2026, 11, 28, 20, 0, tzinfo=TZ) and not jm.all_day
+    assert jm.venue == "Heuvellaan Hilversum, Studio 1"

@@ -15,6 +15,7 @@ SCAN_INTERVAL = timedelta(hours=3)
 DEFAULT_SOURCES = "\n".join([
     "De Vorstin | https://vorstin.nl/?agenda_json",
     "De Vioolkist | https://devioolkist.nl/agenda/",
+    "Heuvellaan | https://www.heuvellaan.com/agenda/",
     "Live Hilversum | https://www.livehilversum.com/nl/agenda",
 ])
 DEFAULT_EXCLUDE = "film, rondleiding, workshop, markt, expositie, tentoonstelling, comedy, bingo, besloten"

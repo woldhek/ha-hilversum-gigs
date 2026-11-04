@@ -7,6 +7,7 @@ Each source is just a URL. We try, in order:
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -225,6 +226,78 @@ def _looks_wp_ptb(data) -> bool:
 _ARCHIVE_TYPE_RE = re.compile(r'<body[^>]+class="[^"]*\bpost-type-archive-([a-z0-9_-]+)')
 
 
+# ---------- Heuvellaan (Stichting Omroep Muziek) ----------
+# The agenda (/agenda/) lists date, series and title per concert; the start time, studio and ticket link are
+# only on each concert's own page, which is fetched once and remembered.
+HEUVELLAAN_AGENDA = "https://www.heuvellaan.com/agenda/"
+_MONTHS = {m: i for i, m in enumerate(["januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus",
+                                       "september", "oktober", "november", "december"], 1)}
+_HV_CARD_RE = re.compile(
+    r"<div>\s*(\d{1,2}) ([a-z]+) (\d{4})\s*</div>\s*<div[^>]*text-right[^>]*>(.*?)</div>"
+    r".*?<h3[^>]*>(.*?)</h3>.*?<a href=[\"']?(https?://[^\"'\s>]+/concert/[^\"'\s>]+)", re.S)
+_HV_TIME_RE = re.compile(r"Aanvang[^<]*</div>\s*<div[^>]*>\s*(\d{1,2})[:.](\d{2})", re.S)
+_HV_PLACE_RE = re.compile(r">Locatie</div>\s*<div[^>]*>(.*?)</div>", re.S)
+_HV_TICKET_RE = re.compile(r"<a href=[\"']?(https?://[^\"'\s>]+)[^>]*>\s*koop", re.S | re.I)
+_DETAIL_CACHE: dict[str, dict] = {}
+
+
+def parse_heuvellaan_agenda(html: str, source: str) -> list[Gig]:
+    gigs = []
+    for day, month, year, series, title, url in _HV_CARD_RE.findall(html):
+        if month not in _MONTHS:
+            continue
+        start = datetime.combine(date(int(year), _MONTHS[month], int(day)), time(0), TZ)
+        gig = _make(source, "Heuvellaan", unescape(title), start, None, url, all_day=True)
+        if gig:
+            gig.genre = _clean(series)
+            gigs.append(gig)
+    return gigs
+
+
+def parse_heuvellaan_detail(html: str) -> dict:
+    out = {}
+    if m := _HV_TIME_RE.search(html):
+        out["time"] = (int(m[1]), int(m[2]))
+    if m := _HV_PLACE_RE.search(html):
+        out["place"] = _clean(m[1])
+    if m := _HV_TICKET_RE.search(html):
+        out["tickets"] = unescape(m[1])
+    return out
+
+
+def apply_heuvellaan_detail(gig: Gig, detail: dict) -> None:
+    if "time" in detail:
+        h, mi = detail["time"]
+        gig.start = gig.start.replace(hour=h, minute=mi)
+        gig.end = gig.start + timedelta(hours=2, minutes=30)
+        gig.all_day = False
+    if detail.get("place"):
+        gig.venue = detail["place"]
+    gig.ticket_url = detail.get("tickets") or gig.ticket_url
+
+
+async def fetch_heuvellaan(session, name: str) -> list[Gig]:
+    st, _, html = await _get(session, HEUVELLAAN_AGENDA)
+    if st >= 400:
+        raise aiohttp.ClientResponseError(None, (), status=st, message=f"HTTP {st} for {HEUVELLAAN_AGENDA}")
+    gigs = parse_heuvellaan_agenda(html, name)
+    sem = asyncio.Semaphore(4)
+
+    async def detail(g: Gig):
+        if g.url not in _DETAIL_CACHE:
+            async with sem:
+                try:
+                    s2, _, page = await _get(session, g.url)
+                    if s2 == 200:
+                        _DETAIL_CACHE[g.url] = parse_heuvellaan_detail(page)
+                except aiohttp.ClientError:
+                    return  # keep it as an all-day event this time
+        apply_heuvellaan_detail(g, _DETAIL_CACHE.get(g.url, {}))
+
+    await asyncio.gather(*(detail(g) for g in gigs))
+    return gigs
+
+
 # ---------- Date in the link (De Vorstin fallback) ----------
 # De Vorstin's agenda is drawn by React; the HTML only has a list of links for search engines, with the date
 # at the end of each slug: -13-11-2026/, -13112026/, -14-11-26/, or -24-10/ (no year).
@@ -325,6 +398,8 @@ async def _get(session: aiohttp.ClientSession, url: str) -> tuple[int, str, str]
 
 async def fetch_source(session: aiohttp.ClientSession, name: str, url: str) -> tuple[list[Gig], str]:
     """Return (gigs, method) for one source. Raises on network errors."""
+    if urlparse(url).netloc.endswith("heuvellaan.com"):
+        return await fetch_heuvellaan(session, name), "heuvellaan"
     status, ctype, body = await _get(session, url)
     if status >= 400:
         raise aiohttp.ClientResponseError(None, (), status=status, message=f"HTTP {status} for {url}")
